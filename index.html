@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preservativo Defender: Misión Antifecundación</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:#080612;color:#fff;font-family:Arial,Helvetica,sans-serif}
+  body{display:flex;align-items:center;justify-content:center;padding:12px}
+  #app{position:relative;width:min(1180px,100%);user-select:none}
+  #game{
+    width:100%;aspect-ratio:16/9;display:block;border-radius:22px;background:#0d0920;
+    box-shadow:0 20px 70px rgba(0,0,0,.55);cursor:crosshair;touch-action:none
+  }
+  #hud{
+    position:absolute;top:10px;left:10px;right:10px;z-index:4;
+    display:flex;gap:7px;flex-wrap:wrap;justify-content:space-between;pointer-events:none
+  }
+  .chip{
+    background:rgba(9,7,24,.78);border:1px solid rgba(255,255,255,.16);
+    border-radius:13px;padding:8px 10px;font-size:13px;backdrop-filter:blur(5px)
+  }
+  #specialWrap{width:92px;height:7px;background:rgba(255,255,255,.14);border-radius:999px;display:inline-block;overflow:hidden;vertical-align:middle}
+  #specialFill{height:100%;width:0%;background:#7ef9ff}
+  #integrityWrap{width:82px;height:7px;background:rgba(255,255,255,.14);border-radius:999px;display:inline-block;overflow:hidden;vertical-align:middle}
+  #integrityFill{height:100%;width:100%;background:#88f4ff}
+  #message{
+    position:absolute;top:62px;left:50%;transform:translateX(-50%);z-index:5;
+    background:rgba(7,4,20,.83);border:1px solid rgba(255,255,255,.15);
+    padding:8px 14px;border-radius:999px;font-weight:700;opacity:0;transition:.18s;
+    pointer-events:none;text-align:center;max-width:80%
+  }
+  #weaponBar{
+    position:absolute;left:12px;bottom:12px;z-index:5;display:flex;gap:7px;flex-wrap:wrap
+  }
+  .weaponBtn{
+    border:1px solid rgba(255,255,255,.2);background:rgba(12,8,30,.82);color:#fff;
+    border-radius:12px;padding:9px 11px;font-size:12px;cursor:pointer;min-height:42px
+  }
+  .weaponBtn.active{outline:2px solid #7ef9ff;background:rgba(32,24,70,.9)}
+  .weaponBtn:disabled{opacity:.45;cursor:not-allowed}
+  #mobileFire{
+    display:none;position:absolute;right:14px;bottom:14px;z-index:6;
+    width:76px;height:76px;border-radius:50%;border:2px solid rgba(255,255,255,.35);
+    background:rgba(255,95,189,.82);color:#fff;font-weight:800;font-size:14px
+  }
+  #overlay{
+    position:absolute;inset:0;z-index:10;border-radius:22px;background:
+    radial-gradient(circle at center,rgba(44,18,65,.97),rgba(7,4,18,.98));
+    display:flex;align-items:center;justify-content:center;padding:22px
+  }
+  #panel{
+    width:min(780px,96%);background:rgba(25,13,45,.96);border:1px solid rgba(255,255,255,.15);
+    border-radius:24px;padding:28px;box-shadow:0 18px 50px rgba(0,0,0,.4)
+  }
+  h1{margin:0 0 6px;font-size:clamp(30px,5vw,58px);line-height:1}
+  h2{margin:0 0 10px}
+  p{color:#eadff4;line-height:1.5}
+  .tag{display:inline-block;background:#35204f;color:#dffaff;padding:6px 10px;border-radius:999px;margin-bottom:12px;font-size:13px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+  .mini{background:rgba(255,255,255,.055);border-radius:13px;padding:10px;font-size:13px;color:#eadff4}
+  .mainBtn{
+    border:0;border-radius:14px;padding:13px 20px;background:#ff85d0;color:#2b1028;
+    font-size:16px;font-weight:800;cursor:pointer
+  }
+  .small{font-size:12px;color:#bcaec9}
+  @media(max-width:720px){
+    .chip{font-size:11px;padding:6px 8px}
+    #hud{gap:4px}
+    #weaponBar{max-width:75%}
+    .weaponBtn{padding:7px 8px;font-size:10px}
+    #mobileFire{display:block}
+    .grid{grid-template-columns:1fr}
+    #panel{padding:20px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="game" width="1280" height="720" aria-label="Juego Preservativo Defender"></canvas>
+
+  <div id="hud">
+    <div class="chip">❤️ Vidas <b id="lives">3</b></div>
+    <div class="chip">🛡️ Integridad <span id="integrityWrap"><span id="integrityFill"></span></span> <b id="integrity">100%</b></div>
+    <div class="chip">⭐ <b id="score">0</b></div>
+    <div class="chip">🔥 Combo <b id="combo">x1</b></div>
+    <div class="chip">🌊 <b id="wave">1/5</b></div>
+    <div class="chip">🧬 <b id="blocked">0</b></div>
+    <div class="chip">⚡ Pulso <span id="specialWrap"><span id="specialFill"></span></span></div>
+  </div>
+
+  <div id="message"></div>
+
+  <div id="weaponBar">
+    <button class="weaponBtn active" id="normalBtn" type="button">1 · Disparo protector</button>
+    <button class="weaponBtn" id="gelBtn" type="button">2 · Gel espermicida <span id="gelCount">(3)</span></button>
+    <button class="weaponBtn" id="shieldBtn" type="button">3 · Escudo de látex <span id="shieldCount">(2)</span></button>
+    <button class="weaponBtn" id="pulseBtn" type="button" disabled>4 · Pulso protector</button>
+  </div>
+
+  <button id="mobileFire" type="button">DISPARAR</button>
+
+  <div id="overlay">
+    <div id="panel">
+      <span class="tag">ARCADE EDUCATIVO · UN JUGADOR</span>
+      <h1>PRESERVATIVO DEFENDER</h1>
+      <h2>Protege el óvulo. Bloquea el paso.</h2>
+      <p>Controlas el <b>Cañón Protector</b>, una defensa futurista situada frente al cuello uterino. Apunta con el mouse o con el dedo y dispara energía protectora antes de que los espermatozoides alcancen el óvulo.</p>
+      <div class="grid">
+        <div class="mini">🖱️ <b>Mouse:</b> mueve la mira y haz clic para disparar.</div>
+        <div class="mini">📱 <b>Celular:</b> toca para apuntar y usa DISPARAR.</div>
+        <div class="mini">❄️ <b>Gel:</b> ralentiza temporalmente a todos.</div>
+        <div class="mini">🛡️ <b>Escudo:</b> bloquea el paso durante 5 s.</div>
+        <div class="mini">⚡ <b>Pulso:</b> se carga con bloqueos y limpia enemigos cercanos.</div>
+        <div class="mini">🔥 <b>Combo:</b> 5=x2, 10=x3, 20=x5.</div>
+      </div>
+      <p class="small">Representación educativa y simplificada. El preservativo es un método de barrera que ayuda a impedir el paso de los espermatozoides y reduce el riesgo de infecciones de transmisión sexual cuando se usa correctamente.</p>
+      <button class="mainBtn" id="startBtn" type="button">INICIAR MISIÓN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+'use strict';
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const W=canvas.width,H=canvas.height;
+
+const ui={
+  lives:document.getElementById('lives'),
+  integrity:document.getElementById('integrity'),
+  integrityFill:document.getElementById('integrityFill'),
+  score:document.getElementById('score'),
+  combo:document.getElementById('combo'),
+  wave:document.getElementById('wave'),
+  blocked:document.getElementById('blocked'),
+  specialFill:document.getElementById('specialFill'),
+  message:document.getElementById('message'),
+  overlay:document.getElementById('overlay'),
+  panel:document.getElementById('panel'),
+  normalBtn:document.getElementById('normalBtn'),
+  gelBtn:document.getElementById('gelBtn'),
+  shieldBtn:document.getElementById('shieldBtn'),
+  pulseBtn:document.getElementById('pulseBtn'),
+  gelCount:document.getElementById('gelCount'),
+  shieldCount:document.getElementById('shieldCount'),
+  mobileFire:document.getElementById('mobileFire')
+};
+
+const uterus={x:640,y:315,rx:248,ry:170,cervixY:520};
+const ovum={x:640,y:295,r:23};
+const turret={x:640,y:640,angle:-Math.PI/2};
+const cross={x:640,y:310};
+
+let audioCtx=null;
+let running=false,ended=false,last=performance.now();
+let lives=3,integrity=100,score=0,blocked=0,comboKills=0,bestCombo=0;
+let wave=1,waveTimer=0,spawnTimer=.5,pulse=0;
+let gelCharges=3,shieldCharges=2,gelTime=0,shieldTime=0,rapidTime=0,doubleTime=0,freezeTime=0;
+let screenShake=0,flash=0;
+let weapon='normal';
+let bossSpawned=false,bossDefeated=false;
+let pointerDown=false;
+
+const enemies=[],shots=[],particles=[],floaters=[],powerups=[],stars=[];
+
+for(let i=0;i<90;i++)stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*2+0.4,s:Math.random()*12+5});
+
+function rand(a,b){return a+Math.random()*(b-a)}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+
+function beep(freq=440,duration=.06,type='sine',vol=.035){
+  try{
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    o.type=type;o.frequency.value=freq;g.gain.value=vol;
+    o.connect(g);g.connect(audioCtx.destination);
+    o.start();g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration);
+    o.stop(audioCtx.currentTime+duration);
+  }catch(e){}
+}
+
+function updateUI(){
+  ui.lives.textContent=lives;
+  ui.integrity.textContent=Math.round(integrity)+'%';
+  ui.integrityFill.style.width=clamp(integrity,0,100)+'%';
+  ui.score.textContent=Math.floor(score);
+  const mult=comboMultiplier();
+  ui.combo.textContent='x'+mult;
+  ui.wave.textContent=wave+'/5';
+  ui.blocked.textContent=blocked;
+  ui.specialFill.style.width=clamp(pulse,0,100)+'%';
+  ui.pulseBtn.disabled=pulse<100||!running;
+  ui.gelCount.textContent='('+gelCharges+')';
+  ui.shieldCount.textContent='('+shieldCharges+')';
+  ui.gelBtn.disabled=gelCharges<=0||!running;
+  ui.shieldBtn.disabled=shieldCharges<=0||!running;
+}
+
+let msgT;
+function message(t){
+  ui.message.textContent=t;
+  ui.message.style.opacity='1';
+  clearTimeout(msgT);
+  msgT=setTimeout(()=>ui.message.style.opacity='0',1100);
+}
+
+function comboMultiplier(){
+  if(comboKills>=20)return 5;
+  if(comboKills>=10)return 3;
+  if(comboKills>=5)return 2;
+  return 1;
+}
+
+function setWeapon(w){
+  weapon=w;
+  [ui.normalBtn,ui.gelBtn,ui.shieldBtn,ui.pulseBtn].forEach(b=>b.classList.remove('active'));
+  if(w==='normal')ui.normalBtn.classList.add('active');
+  if(w==='gel')ui.gelBtn.classList.add('active');
+  if(w==='shield')ui.shieldBtn.classList.add('active');
+  if(w==='pulse')ui.pulseBtn.classList.add('active');
+}
+
+function spawnEnemy(kind='normal'){
+  const side=Math.random();
+  let x,y;
+  if(side<.72){x=rand(220,1060);y=H+30;}
+  else if(side<.86){x=-30;y=rand(420,680);}
+  else{x=W+30;y=rand(420,680);}
+
+  let hp=1,speed=64+wave*15+rand(-5,18),r=13,zig=false,boss=false;
+  if(wave>=3&&Math.random()<.38)zig=true;
+  if(kind==='boss'){hp=12;speed=78;r=28;zig=true;boss=true;x=640;y=H+40;}
+
+  enemies.push({
+    x,y,px:x,py:y,r,hp,maxHp:hp,speed,phase:rand(0,Math.PI*2),zig,boss,
+    reachedCervix:false,alpha:1
+  });
+}
+
+function spawnPowerup(){
+  const types=['heart','repair','rapid','freeze','double'];
+  const type=types[Math.floor(Math.random()*types.length)];
+  powerups.push({x:rand(270,1010),y:rand(180,480),type,r:18,t:0,life:10});
+}
+
+function burst(x,y,color,n=16){
+  for(let i=0;i<n;i++)particles.push({
+    x,y,vx:rand(-180,180),vy:rand(-180,180),life:rand(.25,.8),r:rand(2,5),color
+  });
+}
+
+function floater(x,y,text,color='#fff'){
+  floaters.push({x,y,text,color,life:.9});
+}
+
+function aimAt(x,y){
+  cross.x=clamp(x,0,W);cross.y=clamp(y,0,H);
+  turret.angle=Math.atan2(cross.y-turret.y,cross.x-turret.x);
+}
+
+function shoot(){
+  if(!running||ended)return;
+
+  if(weapon==='gel'){
+    if(gelCharges<=0){setWeapon('normal');return;}
+    gelCharges--;gelTime=5;
+    message('❄️ Gel espermicida: enemigos ralentizados');
+    burst(turret.x,turret.y-30,'#86f7ff',30);beep(260,.15,'triangle',.05);
+    setWeapon('normal');updateUI();return;
+  }
+
+  if(weapon==='shield'){
+    if(shieldCharges<=0){setWeapon('normal');return;}
+    shieldCharges--;shieldTime=5;
+    message('🛡️ Escudo de látex activo 5 s');
+    burst(640,560,'#c9f8ff',28);beep(520,.18,'sine',.05);
+    setWeapon('normal');updateUI();return;
+  }
+
+  if(weapon==='pulse'){
+    if(pulse<100){setWeapon('normal');return;}
+    pulse=0;
+    let removed=0;
+    for(let i=enemies.length-1;i>=0;i--){
+      const e=enemies[i];
+      if(dist(e,turret)<520){
+        burst(e.x,e.y,'#f3b6ff',24);removed++;
+        killEnemy(i,true);
+      }
+    }
+    message('⚡ Pulso protector: '+removed+' bloqueados');
+    screenShake=.35;beep(120,.25,'sawtooth',.06);
+    setWeapon('normal');updateUI();return;
+  }
+
+  const cooldownBoost=rapidTime>0;
+  const speed=900;
+  const ang=turret.angle;
+  shots.push({
+    x:turret.x+Math.cos(ang)*42,
+    y:turret.y+Math.sin(ang)*42,
+    vx:Math.cos(ang)*speed,
+    vy:Math.sin(ang)*speed,
+    r:cooldownBoost?6:5,life:1.2,damage:1
+  });
+  beep(cooldownBoost?760:620,.04,'square',.025);
+}
+
+let lastShotTime=0;
+function tryShoot(){
+  const now=performance.now();
+  const cd=rapidTime>0?90:170;
+  if(now-lastShotTime<cd&&weapon==='normal')return;
+  lastShotTime=now;shoot();
+}
+
+function killEnemy(index,fromPulse=false){
+  if(index<0||index>=enemies.length)return;
+  const e=enemies[index];
+  enemies.splice(index,1);
+  blocked++;
+  comboKills++;
+  bestCombo=Math.max(bestCombo,comboKills);
+  const mult=comboMultiplier();
+  const base=e.boss?1500:100;
+  const gain=base*mult*(doubleTime>0?2:1);
+  score+=gain;
+  pulse=clamp(pulse+(e.boss?35:7),0,100);
+  burst(e.x,e.y,e.boss?'#ffdc74':'#b9f9ff',e.boss?55:18);
+  floater(e.x,e.y-14,'¡BLOQUEADO! +'+gain,e.boss?'#ffe07a':'#fff');
+  if(comboKills===5||comboKills===10||comboKills===20)message('🔥 COMBO x'+mult);
+  if(blocked%12===0&&Math.random()<.8)spawnPowerup();
+  if(e.boss){bossDefeated=true;message('👑 ¡Amenaza especial neutralizada!');}
+  if(!fromPulse)beep(e.boss?170:900,e.boss?.18:.05,'triangle',e.boss?.06:.03);
+  updateUI();
+}
+
+function enemyHitsBarrier(e){
+  return e.y<=uterus.cervixY+46 && Math.abs(e.x-uterus.x)<95;
+}
+
+function damageBarrier(amount){
+  comboKills=0;
+  if(shieldTime>0){
+    message('🛡️ Escudo bloqueó el impacto');
+    beep(300,.08,'sine',.035);
+    return;
+  }
+  integrity-=amount;
+  integrity=clamp(integrity,0,100);
+  flash=.18;screenShake=.22;beep(95,.16,'sawtooth',.05);
+  message('⚠️ La barrera perdió resistencia');
+  if(integrity<=0){
+    integrity=0;
+    lives--;
+    integrity=lives>0?55:0;
+    if(lives>0)message('❤️ Se perdió una vida');
+  }
+  updateUI();
+  if(lives<=0)loseGame();
+}
+
+function collectPower(p,index){
+  if(p.type==='heart'){lives=Math.min(3,lives+1);message('❤️ Vida recuperada');}
+  if(p.type==='repair'){integrity=Math.min(100,integrity+30);message('🛡️ Integridad +30%');}
+  if(p.type==='rapid'){rapidTime=7;message('⚡ Disparo rápido 7 s');}
+  if(p.type==='freeze'){freezeTime=4;message('❄️ Congelación 4 s');}
+  if(p.type==='double'){doubleTime=8;message('✖2 Puntaje doble 8 s');}
+  score+=150;burst(p.x,p.y,'#fff3a6',24);beep(1040,.09,'sine',.04);
+  powerups.splice(index,1);updateUI();
+}
+
+function update(dt){
+  if(!running||ended)return;
+
+  flash=Math.max(0,flash-dt);
+  screenShake=Math.max(0,screenShake-dt);
+  gelTime=Math.max(0,gelTime-dt);
+  shieldTime=Math.max(0,shieldTime-dt);
+  rapidTime=Math.max(0,rapidTime-dt);
+  freezeTime=Math.max(0,freezeTime-dt);
+  doubleTime=Math.max(0,doubleTime-dt);
+
+  waveTimer+=dt;
+  const waveLengths=[0,17,19,21,22,26];
+  if(wave<5 && waveTimer>=waveLengths[wave]){
+    wave++;waveTimer=0;score+=500;spawnTimer=.2;
+    message('🌊 OLEADA '+wave);
+    beep(440,.08,'triangle',.04);setTimeout(()=>beep(660,.1,'triangle',.04),80);
+  }
+
+  if(wave===5 && waveTimer>10 && !bossSpawned){
+    bossSpawned=true;spawnEnemy('boss');message('👑 ¡Amenaza especial!');beep(110,.35,'sawtooth',.06);
+  }
+
+  if(wave===5 && waveTimer>=26 && bossDefeated){
+    winGame();return;
+  }
+
+  spawnTimer-=dt;
+  if(spawnTimer<=0){
+    let count=1;
+    if(wave===4&&Math.random()<.55)count=Math.random()<.45?3:2;
+    if(wave===5&&Math.random()<.38)count=2;
+    for(let i=0;i<count;i++)spawnEnemy();
+    const bases=[0,1.05,.83,.72,.58,.46];
+    spawnTimer=Math.max(.2,bases[wave]+rand(-.08,.18));
+  }
+
+  for(let i=shots.length-1;i>=0;i--){
+    const s=shots[i];
+    s.x+=s.vx*dt;s.y+=s.vy*dt;s.life-=dt;
+    let hit=false;
+    for(let j=enemies.length-1;j>=0;j--){
+      const e=enemies[j];
+      if(Math.hypot(s.x-e.x,s.y-e.y)<s.r+e.r){
+        e.hp-=s.damage;hit=true;
+        burst(s.x,s.y,'#7ef9ff',7);
+        if(e.hp<=0)killEnemy(j,false);
+        else{floater(e.x,e.y-22,'-'+s.damage,'#ffe49b');beep(330,.035,'square',.018);}
+        break;
+      }
+    }
+    if(hit||s.life<=0||s.x<-30||s.x>W+30||s.y<-30||s.y>H+30)shots.splice(i,1);
+  }
+
+  const globalSlow=(gelTime>0?.45:1)*(freezeTime>0?.08:1);
+  for(let i=enemies.length-1;i>=0;i--){
+    const e=enemies[i];
+    e.px=e.x;e.py=e.y;e.phase+=dt*(e.boss?5:8);
+    let tx=uterus.x,ty=uterus.cervixY+8;
+    let dx=tx-e.x,dy=ty-e.y,l=Math.hypot(dx,dy)||1;
+    const wig=e.zig?Math.sin(e.phase)*(e.boss?55:28):Math.sin(e.phase)*8;
+    const perpX=-dy/l,perpY=dx/l;
+    e.x+=(dx/l*e.speed + perpX*wig)*dt*globalSlow;
+    e.y+=(dy/l*e.speed + perpY*wig)*dt*globalSlow;
+
+    if(enemyHitsBarrier(e)){
+      if(shieldTime>0){
+        burst(e.x,e.y,'#a8fbff',22);killEnemy(i,false);continue;
+      }
+      const dmg=e.boss?38:rand(11,17);
+      burst(e.x,e.y,'#ff789f',25);
+      enemies.splice(i,1);
+      damageBarrier(dmg);
+      if(!running)return;
+    }
+  }
+
+  for(let i=powerups.length-1;i>=0;i--){
+    const p=powerups[i];p.t+=dt;p.life-=dt;
+    if(p.life<=0){powerups.splice(i,1);continue;}
+    for(let j=shots.length-1;j>=0;j--){
+      const s=shots[j];
+      if(Math.hypot(s.x-p.x,s.y-p.y)<s.r+p.r){
+        shots.splice(j,1);collectPower(p,i);break;
+      }
+    }
+  }
+
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.985;p.vy*=.985;p.life-=dt;
+    if(p.life<=0)particles.splice(i,1);
+  }
+  for(let i=floaters.length-1;i>=0;i--){
+    const f=floaters[i];f.y-=55*dt;f.life-=dt;
+    if(f.life<=0)floaters.splice(i,1);
+  }
+
+  for(const st of stars){
+    st.y+=st.s*dt;if(st.y>H){st.y=0;st.x=Math.random()*W;}
+  }
+}
+
+function drawBackground(){
+  const g=ctx.createRadialGradient(W/2,300,80,W/2,350,750);
+  g.addColorStop(0,'#2b143e');g.addColorStop(.55,'#140b27');g.addColorStop(1,'#080612');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+  for(const st of stars){
+    ctx.globalAlpha=.25;ctx.fillStyle='#c5eaff';ctx.beginPath();ctx.arc(st.x,st.y,st.r,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawUterus(){
+  ctx.save();ctx.translate(uterus.x,uterus.y);
+  ctx.lineCap='round';
+  ctx.lineWidth=32;ctx.strokeStyle='#b84e87';
+  ctx.beginPath();ctx.moveTo(-180,-65);ctx.bezierCurveTo(-292,-138,-352,-100,-402,-40);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(180,-65);ctx.bezierCurveTo(292,-138,352,-100,402,-40);ctx.stroke();
+
+  ctx.lineWidth=9;ctx.strokeStyle='#d56fa8';
+  for(const side of [-1,1])for(let k=-2;k<=2;k++){
+    ctx.beginPath();ctx.moveTo(side*400,-40);ctx.lineTo(side*(428+Math.abs(k)*4),-40+k*16);ctx.stroke();
+  }
+
+  const og=ctx.createRadialGradient(0,-30,30,0,0,285);
+  og.addColorStop(0,'#e68bb5');og.addColorStop(1,'#8f386c');
+  ctx.fillStyle=og;ctx.beginPath();ctx.ellipse(0,0,uterus.rx,uterus.ry,0,0,Math.PI*2);ctx.fill();
+
+  ctx.fillStyle='#381336';ctx.beginPath();ctx.ellipse(0,-3,uterus.rx-33,uterus.ry-39,0,0,Math.PI*2);ctx.fill();
+
+  ctx.strokeStyle='rgba(255,200,230,.15)';ctx.lineWidth=4;
+  for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(-160,-82+i*28);ctx.quadraticCurveTo(0,-50+i*25,160,-82+i*28);ctx.stroke();}
+
+  ctx.fillStyle='#8d3b6a';ctx.beginPath();ctx.roundRect(-64,132,128,160,46);ctx.fill();
+  ctx.fillStyle='#2a0f2b';ctx.beginPath();ctx.roundRect(-28,148,56,150,22);ctx.fill();
+  ctx.restore();
+
+  ctx.save();ctx.translate(ovum.x,ovum.y);
+  const g=ctx.createRadialGradient(-7,-7,3,0,0,ovum.r);
+  g.addColorStop(0,'#fff6ae');g.addColorStop(1,'#ffae50');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,ovum.r,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#ffe5a5';ctx.lineWidth=4;ctx.stroke();
+  ctx.restore();
+}
+
+function drawBarrier(){
+  ctx.save();
+  const y=566;
+  ctx.globalAlpha=shieldTime>0?.95:.74;
+  ctx.strokeStyle=shieldTime>0?'#d8ffff':'#8aeaf4';
+  ctx.lineWidth=shieldTime>0?10:5;
+  ctx.beginPath();ctx.moveTo(500,y);ctx.quadraticCurveTo(640,y-22,780,y);ctx.stroke();
+  if(shieldTime>0){
+    ctx.fillStyle='rgba(140,247,255,.09)';ctx.beginPath();ctx.arc(640,560,165,Math.PI,0);ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawTurret(){
+  ctx.save();ctx.translate(turret.x,turret.y);
+  ctx.fillStyle='#26214b';ctx.strokeStyle='#9df8ff';ctx.lineWidth=3;
+  ctx.beginPath();ctx.arc(0,0,38,0,Math.PI*2);ctx.fill();ctx.stroke();
+
+  ctx.rotate(turret.angle);
+  const grad=ctx.createLinearGradient(0,0,72,0);
+  grad.addColorStop(0,'#a35ed8');grad.addColorStop(1,'#7ef9ff');
+  ctx.fillStyle=grad;
+  ctx.beginPath();ctx.roundRect(10,-10,76,20,10);ctx.fill();
+  ctx.fillStyle='#e9ffff';ctx.beginPath();ctx.arc(85,0,7,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle='#e9faff';ctx.font='bold 13px Arial';ctx.textAlign='center';
+  ctx.fillText('CAÑÓN PROTECTOR',turret.x,turret.y+58);
+}
+
+function drawEnemy(e){
+  ctx.save();ctx.translate(e.x,e.y);
+  const a=Math.atan2(e.y-e.py,e.x-e.px);ctx.rotate(a);
+  ctx.strokeStyle=e.boss?'#ffe38a':'#dffcff';ctx.lineWidth=e.boss?6:4;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(-8,0);
+  ctx.bezierCurveTo(-24,Math.sin(e.phase)*8,-40,-Math.sin(e.phase)*8,-58,0);ctx.stroke();
+  ctx.fillStyle=e.boss?'#f6b24b':'#e9feff';
+  ctx.beginPath();ctx.ellipse(4,0,e.r,e.r*.68,0,0,Math.PI*2);ctx.fill();
+  if(e.boss){
+    ctx.strokeStyle='#fff3a9';ctx.lineWidth=3;ctx.stroke();
+    ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(-24,-42,56,6);
+    ctx.fillStyle='#ffd25c';ctx.fillRect(-24,-42,56*(e.hp/e.maxHp),6);
+  }
+  ctx.restore();
+}
+
+function drawShot(s){
+  ctx.fillStyle='#83fbff';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();
+  ctx.globalAlpha=.25;ctx.beginPath();ctx.arc(s.x,s.y,s.r*3.2,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+}
+
+function powerEmoji(type){
+  return {heart:'❤️',repair:'🛡️',rapid:'⚡',freeze:'❄️',double:'✖2'}[type]||'?';
+}
+
+function drawPowerup(p){
+  ctx.save();ctx.translate(p.x,p.y);
+  const sc=1+Math.sin(p.t*6)*.08;ctx.scale(sc,sc);
+  ctx.fillStyle='rgba(255,255,255,.11)';ctx.beginPath();ctx.arc(0,0,25,0,Math.PI*2);ctx.fill();
+  ctx.font=p.type==='double'?'bold 18px Arial':'25px Arial';ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(powerEmoji(p.type),0,1);
+  ctx.restore();
+}
+
+function drawCrosshair(){
+  ctx.save();ctx.translate(cross.x,cross.y);
+  ctx.strokeStyle='#ffffff';ctx.lineWidth=2;ctx.globalAlpha=.85;
+  ctx.beginPath();ctx.arc(0,0,13,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-21,0);ctx.lineTo(-8,0);ctx.moveTo(21,0);ctx.lineTo(8,0);ctx.moveTo(0,-21);ctx.lineTo(0,-8);ctx.moveTo(0,21);ctx.lineTo(0,8);ctx.stroke();
+  ctx.restore();
+}
+
+function drawEffects(){
+  for(const p of particles){
+    ctx.globalAlpha=Math.max(0,p.life/.8);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  for(const f of floaters){
+    ctx.globalAlpha=Math.max(0,f.life/.9);ctx.fillStyle=f.color;ctx.font='bold 19px Arial';ctx.textAlign='center';ctx.fillText(f.text,f.x,f.y);
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawStatus(){
+  const y=102;
+  ctx.textAlign='center';ctx.font='bold 15px Arial';
+  if(gelTime>0){ctx.fillStyle='#94f8ff';ctx.fillText('❄️ GEL '+gelTime.toFixed(1)+' s',520,y);}
+  if(shieldTime>0){ctx.fillStyle='#e0ffff';ctx.fillText('🛡️ ESCUDO '+shieldTime.toFixed(1)+' s',640,y);}
+  if(doubleTime>0){ctx.fillStyle='#ffe888';ctx.fillText('✖2 '+doubleTime.toFixed(1)+' s',760,y);}
+}
+
+function draw(){
+  ctx.save();
+  if(screenShake>0)ctx.translate(rand(-6,6),rand(-6,6));
+  drawBackground();drawUterus();drawBarrier();
+  enemies.forEach(drawEnemy);
+  powerups.forEach(drawPowerup);
+  shots.forEach(drawShot);
+  drawTurret();drawEffects();drawCrosshair();drawStatus();
+
+  ctx.fillStyle='rgba(255,255,255,.65)';ctx.font='14px Arial';ctx.textAlign='center';
+  ctx.fillText('ÚTERO',640,105);
+  ctx.fillText('CUELLO UTERINO',640,523);
+
+  if(flash>0){ctx.fillStyle='rgba(255,45,100,'+(flash*.65)+')';ctx.fillRect(0,0,W,H);}
+  ctx.restore();
+}
+
+function reset(){
+  lives=3;integrity=100;score=0;blocked=0;comboKills=0;bestCombo=0;
+  wave=1;waveTimer=0;spawnTimer=.5;pulse=0;gelCharges=3;shieldCharges=2;
+  gelTime=0;shieldTime=0;rapidTime=0;doubleTime=0;freezeTime=0;
+  bossSpawned=false;bossDefeated=false;screenShake=0;flash=0;
+  enemies.length=0;shots.length=0;particles.length=0;floaters.length=0;powerups.length=0;
+  cross.x=640;cross.y=310;aimAt(cross.x,cross.y);setWeapon('normal');updateUI();
+}
+
+function showEnd(win){
+  running=false;ended=true;
+  ui.overlay.style.display='flex';
+  ui.panel.innerHTML=`
+    <span class="tag">${win?'MISIÓN COMPLETADA':'FIN DE LA MISIÓN'}</span>
+    <h1>${win?'🛡️ PROTECCIÓN EXITOSA':'🧬 FECUNDACIÓN OCURRIDA'}</h1>
+    <h2>${win?'Bloqueaste el paso y protegiste el óvulo.':'Un espermatozoide logró superar la protección.'}</h2>
+    <div class="grid">
+      <div class="mini">⭐ Puntuación final: <b>${Math.floor(score)}</b></div>
+      <div class="mini">🧬 Bloqueados: <b>${blocked}</b></div>
+      <div class="mini">🔥 Mejor combo: <b>${bestCombo}</b></div>
+      <div class="mini">🌊 Oleada alcanzada: <b>${wave}/5</b></div>
+    </div>
+    <p>El preservativo funciona como un método de barrera que ayuda a impedir el paso de los espermatozoides y también reduce el riesgo de infecciones de transmisión sexual cuando se usa correctamente.</p>
+    <button class="mainBtn" id="againBtn" type="button">JUGAR DE NUEVO</button>`;
+  document.getElementById('againBtn').addEventListener('click',()=>{
+    reset();ended=false;ui.overlay.style.display='none';running=true;last=performance.now();message('🛡️ ¡Defiende el óvulo!');
+  });
+}
+
+function loseGame(){showEnd(false)}
+function winGame(){score+=2500;updateUI();showEnd(true)}
+
+function canvasPoint(e){
+  const r=canvas.getBoundingClientRect();
+  return {x:(e.clientX-r.left)*W/r.width,y:(e.clientY-r.top)*H/r.height};
+}
+
+canvas.addEventListener('pointermove',e=>{const p=canvasPoint(e);aimAt(p.x,p.y);});
+canvas.addEventListener('pointerdown',e=>{
+  e.preventDefault();pointerDown=true;
+  const p=canvasPoint(e);aimAt(p.x,p.y);tryShoot();
+});
+window.addEventListener('pointerup',()=>pointerDown=false);
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='1'){setWeapon('normal');}
+  if(e.key==='2'&&gelCharges>0){setWeapon('gel');}
+  if(e.key==='3'&&shieldCharges>0){setWeapon('shield');}
+  if(e.key==='4'&&pulse>=100){setWeapon('pulse');}
+  if(e.code==='Space'){e.preventDefault();tryShoot();}
+});
+
+ui.normalBtn.addEventListener('click',()=>setWeapon('normal'));
+ui.gelBtn.addEventListener('click',()=>{if(gelCharges>0){setWeapon('gel');shoot();}});
+ui.shieldBtn.addEventListener('click',()=>{if(shieldCharges>0){setWeapon('shield');shoot();}});
+ui.pulseBtn.addEventListener('click',()=>{if(pulse>=100){setWeapon('pulse');shoot();}});
+ui.mobileFire.addEventListener('pointerdown',e=>{e.preventDefault();tryShoot();});
+
+document.getElementById('startBtn').addEventListener('click',()=>{
+  reset();ui.overlay.style.display='none';running=true;ended=false;last=performance.now();
+  message('🛡️ ¡Defiende el óvulo!');
+  beep(440,.07,'triangle',.04);setTimeout(()=>beep(660,.1,'triangle',.04),80);
+});
+
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min(.04,(now-last)/1000);last=now;
+  update(dt);draw();
+}
+reset();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
